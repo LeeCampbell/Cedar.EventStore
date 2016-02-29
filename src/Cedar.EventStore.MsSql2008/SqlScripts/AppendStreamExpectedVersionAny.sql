@@ -3,7 +3,7 @@ BEGIN TRANSACTION AppendStream;
     DECLARE @streamIdInternal AS INT;
     DECLARE @latestStreamVersion AS INT;
 
-     SELECT @streamIdInternal = Streams.IdInternal
+     SELECT @streamIdInternal = dbo.Streams.IdInternal
        FROM Streams
       WHERE Streams.Id = @streamId;
 
@@ -25,7 +25,7 @@ BEGIN TRANSACTION AppendStream;
        ELSE
            BEGIN
                  SELECT TOP(1)
-                         @latestStreamVersion = Events.StreamVersion
+                         @latestStreamVersion = dbo.Events.StreamVersion
                     FROM Events
                    WHERE Events.StreamIDInternal = @streamIdInternal
                 ORDER BY Events.Ordinal DESC;

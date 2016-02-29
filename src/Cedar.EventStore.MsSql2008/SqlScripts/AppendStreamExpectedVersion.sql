@@ -15,10 +15,10 @@ BEGIN TRANSACTION AppendStream;
         END
 
         SELECT TOP(1)
-             @latestStreamVersion = Events.StreamVersion
-        FROM Events
-       WHERE Events.StreamIDInternal = @streamIdInternal
-    ORDER BY Events.Ordinal DESC;
+             @latestStreamVersion = dbo.Events.StreamVersion
+        FROM dbo.Events
+       WHERE dbo.Events.StreamIDInternal = @streamIdInternal
+    ORDER BY dbo.Events.Ordinal DESC;
 
         IF @latestStreamVersion != @expectedStreamVersion
         BEGIN

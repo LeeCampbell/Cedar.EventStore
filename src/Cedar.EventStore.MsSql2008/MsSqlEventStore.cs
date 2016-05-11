@@ -23,7 +23,7 @@
             CreateEventStoreNotifier createEventStoreNotifier,
             string schema = "dbo",
             string logName = "MsSqlEventStore")
-            :base(logName)
+            : base(logName)
         {
             Ensure.That(connectionString, nameof(connectionString)).IsNotNullOrWhiteSpace();
 
@@ -49,17 +49,15 @@
             StreamIdInfo streamIdInfo,
             CancellationToken cancellationToken)
         {
-            using(var connection = _createConnection())
+            using (var connection = _createConnection())
+            using (var command = new SqlCommand(_scripts.DeleteStreamAnyVersion, connection))
             {
-                await connection.OpenAsync(cancellationToken);
+                command.Parameters.AddWithValue("streamId", streamIdInfo.Hash);
 
-                using(var command = new SqlCommand(_scripts.DeleteStreamAnyVersion, connection))
-                {
-                    command.Parameters.AddWithValue("streamId", streamIdInfo.Hash);
-                    await command
-                        .ExecuteNonQueryAsync(cancellationToken)
-                        .NotOnCapturedContext();
-                }
+                await connection.OpenAsync(cancellationToken);
+                await command
+                    .ExecuteNonQueryAsync(cancellationToken)
+                    .NotOnCapturedContext();
             }
         }
 
@@ -68,30 +66,27 @@
             int expectedVersion,
             CancellationToken cancellationToken)
         {
-            using(var connection = _createConnection())
+            using (var connection = _createConnection())
+            using (var command = new SqlCommand(_scripts.DeleteStreamExpectedVersion, connection))
             {
-                await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
-
-                using(var command = new SqlCommand(_scripts.DeleteStreamExpectedVersion, connection))
+                command.Parameters.AddWithValue("streamId", streamIdInfo.Hash);
+                command.Parameters.AddWithValue("expectedStreamVersion", expectedVersion);
+                try
                 {
-                    command.Parameters.AddWithValue("streamId", streamIdInfo.Hash);
-                    command.Parameters.AddWithValue("expectedStreamVersion", expectedVersion);
-                    try
+                    await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
+                    await command
+                        .ExecuteNonQueryAsync(cancellationToken)
+                        .NotOnCapturedContext();
+                }
+                catch (SqlException ex)
+                {
+                    if (ex.Message == "WrongExpectedVersion")
                     {
-                        await command
-                            .ExecuteNonQueryAsync(cancellationToken)
-                            .NotOnCapturedContext();
+                        throw new WrongExpectedVersionException(
+                            Messages.DeleteStreamFailedWrongExpectedVersion(streamIdInfo.Id, expectedVersion),
+                            ex);
                     }
-                    catch(SqlException ex)
-                    {
-                        if(ex.Message == "WrongExpectedVersion")
-                        {
-                            throw new WrongExpectedVersionException(
-                                Messages.DeleteStreamFailedWrongExpectedVersion(streamIdInfo.Id, expectedVersion),
-                                ex);
-                        }
-                        throw;
-                    }
+                    throw;
                 }
             }
         }
@@ -102,13 +97,12 @@
         {
             CheckIfDisposed();
 
-            using(var connection = _createConnection())
+            using (var connection = _createConnection())
             {
                 await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
-
-                if(_scripts.Schema != "dbo")
+                if (_scripts.Schema != "dbo")
                 {
-                    using(var command = new SqlCommand($"CREATE SCHEMA {_scripts.Schema}", connection))
+                    using (var command = new SqlCommand($"CREATE SCHEMA {_scripts.Schema}", connection))
                     {
                         await command
                             .ExecuteNonQueryAsync(cancellationToken)
@@ -118,7 +112,7 @@
 
                 using (var command = new SqlCommand(_scripts.InitializeStore, connection))
                 {
-                    if(ignoreErrors)
+                    if (ignoreErrors)
                     {
                         await ExecuteAndIgnoreErrors(() => command.ExecuteNonQueryAsync(cancellationToken))
                             .NotOnCapturedContext();
@@ -138,22 +132,19 @@
         {
             CheckIfDisposed();
 
-            using(var connection = _createConnection())
+            using (var connection = _createConnection())
+            using (var command = new SqlCommand(_scripts.DropAll, connection))
             {
                 await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
-
-                using(var command = new SqlCommand(_scripts.DropAll, connection))
+                if (ignoreErrors)
                 {
-                    if(ignoreErrors)
-                    {
-                        await ExecuteAndIgnoreErrors(() => command.ExecuteNonQueryAsync(cancellationToken))
-                            .NotOnCapturedContext();
-                    }
-                    else
-                    {
-                        await command.ExecuteNonQueryAsync(cancellationToken)
-                            .NotOnCapturedContext();
-                    }
+                    await ExecuteAndIgnoreErrors(() => command.ExecuteNonQueryAsync(cancellationToken))
+                        .NotOnCapturedContext();
+                }
+                else
+                {
+                    await command.ExecuteNonQueryAsync(cancellationToken)
+                        .NotOnCapturedContext();
                 }
             }
         }
@@ -162,30 +153,27 @@
         {
             CheckIfDisposed();
 
-            using(var connection = _createConnection())
+            using (var connection = _createConnection())
+            using (var command = new SqlCommand(_scripts.ReadHeadCheckpoint, connection))
             {
                 await connection.OpenAsync(cancellationToken);
+                var result = await command
+                    .ExecuteScalarAsync(cancellationToken)
+                    .NotOnCapturedContext();
 
-                using(var command = new SqlCommand(_scripts.ReadHeadCheckpoint, connection))
+                if (result == DBNull.Value)
                 {
-                    var result = await command
-                        .ExecuteScalarAsync(cancellationToken)
-                        .NotOnCapturedContext();
-
-                    if(result == DBNull.Value)
-                    {
-                        return -1;
-                    }
-                    return (long) result;
+                    return -1;
                 }
+                return (long)result;
             }
         }
 
         protected override void Dispose(bool disposing)
         {
-            if(disposing)
+            if (disposing)
             {
-                if(_eventStoreNotifier.IsValueCreated)
+                if (_eventStoreNotifier.IsValueCreated)
                 {
                     _eventStoreNotifier.Value.Dispose();
                 }
@@ -219,13 +207,13 @@
                 Id = id;
 
                 Guid _;
-                if(Guid.TryParse(id, out _))
+                if (Guid.TryParse(id, out _))
                 {
                     Hash = id;
 
                     return;
                 }
-                using(var sha1 = SHA1.Create())
+                using (var sha1 = SHA1.Create())
                 {
                     var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(id));
                     Hash = BitConverter.ToString(hashBytes).Replace("-", string.Empty);

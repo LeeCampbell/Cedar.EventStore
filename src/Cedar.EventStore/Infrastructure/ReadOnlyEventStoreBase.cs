@@ -149,7 +149,7 @@ namespace Cedar.EventStore.Infrastructure
         }
 
         protected abstract Task<AllEventsPage> ReadAllForwardsInternal(
-            long fromCheckpointExlusive,
+            long fromCheckpointExclusive,
             int maxCount,
             CancellationToken cancellationToken);
 

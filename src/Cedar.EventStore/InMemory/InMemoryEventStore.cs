@@ -137,7 +137,7 @@ namespace Cedar.EventStore
         }
 
         protected override Task<AllEventsPage> ReadAllForwardsInternal(
-            long fromCheckpointExlusive,
+            long fromCheckpointExclusive,
             int maxCount,
             CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -158,13 +158,13 @@ namespace Cedar.EventStore
                 }
 
                 var previous = current.Previous;
-                while(current.Value.Checkpoint < fromCheckpointExlusive)
+                while(current.Value.Checkpoint < fromCheckpointExclusive)
                 {
                     if(current.Next == null) // fromCheckpoint is past end of store
                     {
                         return Task.FromResult(
-                            new AllEventsPage(fromCheckpointExlusive,
-                                fromCheckpointExlusive,
+                            new AllEventsPage(fromCheckpointExclusive,
+                                fromCheckpointExclusive,
                                 true,
                                 ReadDirection.Forward));
                     }
@@ -192,10 +192,10 @@ namespace Cedar.EventStore
 
                 var isEnd = current == null;
                 var nextCheckPoint = current?.Value.Checkpoint ?? previous.Value.Checkpoint + 1;
-                fromCheckpointExlusive = streamEvents.Any() ? streamEvents[0].Checkpoint : 0;
+                fromCheckpointExclusive = streamEvents.Any() ? streamEvents[0].Checkpoint : 0;
 
                 var page = new AllEventsPage(
-                    fromCheckpointExlusive,
+                    fromCheckpointExclusive,
                     nextCheckPoint,
                     isEnd,
                     ReadDirection.Forward,
